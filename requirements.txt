@@ -1,0 +1,12 @@
+streamlit>=1.38
+pandas>=2.2
+numpy>=1.26
+plotly>=5.22
+requests>=2.32
+yfinance>=0.2.54
+anthropic>=0.40.0
+python-dotenv>=1.0
+reportlab>=4.2
+ta>=0.11.0
+# openai — opcional, usado como fallback legado em ai_commentary() se OPENAI_API_KEY estiver configurada
+# openai>=1.86

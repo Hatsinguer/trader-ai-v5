@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(.venv\\\\Scripts\\\\python.exe -c \"import py_compile,sys; [py_compile.compile\\(f, doraise=True\\) for f in ['app.py','src/data.py','src/data_brapi.py']]; import src.data as d; print\\('OK', hasattr\\(d,'fetch_b3_history'\\), hasattr\\(d,'DataMeta'\\), d.DataMeta\\('Brapi','14:00:00','15 min delay',True\\).label\\)\")",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe -c \"from src.data import fetch_b3_history; df, meta = fetch_b3_history\\('PETR4', period='6mo'\\); print\\('rows:', len\\(df\\)\\); print\\('fonte:', meta.label, '| confiavel:', meta.confiavel\\); print\\(df.tail\\(2\\).to_string\\(\\)\\)\")",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe -c \"import py_compile; [py_compile.compile\\(f, doraise=True\\) for f in ['app.py','src/indicators.py','src/patterns.py','src/analysis.py']]; print\\('compile OK'\\)\")",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe _smoke_v5.py)",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe -c \"import py_compile; [py_compile.compile\\(f, doraise=True\\) for f in ['app.py','src/asset_classifier.py','src/fundamentals.py','src/analysis.py']]; print\\('compile OK'\\)\")",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe _smoke_s3.py)",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe -c \"import py_compile; [py_compile.compile\\(f, doraise=True\\) for f in ['app.py','src/storage.py','src/alerts.py','src/analysis.py']]; print\\('compile OK'\\)\")",
+      "PowerShell(.venv\\\\Scripts\\\\python.exe _smoke_s4.py)",
+      "PowerShell(Remove-Item *)"
+    ]
+  }
+}
