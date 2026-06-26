@@ -61,6 +61,25 @@ def binance_meta() -> DataMeta:
     return DataMeta(fonte="Binance Spot", atualizado_em=_now_hms(), tipo_dado="tempo real", confiavel=True)
 
 
+def get_usd_brl_rate() -> float:
+    """Taxa de câmbio USD/BRL em tempo real. Tenta Yahoo Finance e Awesomeapi como fallback."""
+    try:
+        df = yf.Ticker("USDBRL=X").history(period="2d")
+        if not df.empty:
+            return float(df["Close"].iloc[-1])
+    except Exception:
+        pass
+    try:
+        r = requests.get(
+            "https://economia.awesomeapi.com.br/json/last/USD-BRL",
+            timeout=10,
+        )
+        r.raise_for_status()
+        return float(r.json()["USDBRL"]["bid"])
+    except Exception:
+        return 5.70
+
+
 _BINANCE_INTERVAL_MAP = {"1wk": "1w", "1mo": "1M"}
 
 
@@ -197,39 +216,54 @@ def fetch_coinbase_klines(symbol: str, interval: str = "1d", limit: int = 500) -
 
 
 def fetch_crypto_history(symbol: str, interval: str = "1d", limit: int = 500) -> tuple[pd.DataFrame, DataMeta]:
-    """Histórico de cripto com fallback em cascata: Binance → Coinbase → Yahoo Finance.
+    """Histórico de cripto em BRL com fallback em cascata: Binance → Coinbase → Yahoo Finance.
 
-    - Binance: dado em tempo real, bloqueado no Brasil (451).
-    - Coinbase: dado em tempo real, requer cdp_api_key.json.
-    - Yahoo Finance: dado com delay, sempre disponível.
+    Preços retornados já convertidos de USD para BRL usando taxa em tempo real.
     """
     sym = symbol.upper().replace("/", "")
 
     # 1. Binance
     try:
         df = fetch_binance_klines(sym, interval, limit)
-        return df, binance_meta()
+        meta = binance_meta()
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else 0
         if status == 400:
             raise DataError(f"Símbolo '{sym}' não reconhecido na Binance.") from exc
+        df, meta = None, None
     except Exception:
-        pass
+        df, meta = None, None
 
     # 2. Coinbase (tempo real, sem geobloqueio)
-    # Mínimo de 70 linhas garante SMA50 (50 warmup) + 20 candles limpos para indicadores v5.
-    try:
-        df = fetch_coinbase_klines(sym, interval, limit)
-        if len(df) >= 70:
-            return df, DataMeta(fonte="Coinbase", atualizado_em=_now_hms(), tipo_dado="tempo real", confiavel=True)
-    except Exception:
-        pass
+    if df is None:
+        try:
+            df = fetch_coinbase_klines(sym, interval, limit)
+            if len(df) >= 70:
+                meta = DataMeta(fonte="Coinbase", atualizado_em=_now_hms(), tipo_dado="tempo real", confiavel=True)
+            else:
+                df = None
+        except Exception:
+            df = None
 
-    # 3. Yahoo Finance (fallback final com delay)
-    yf_sym = _symbol_binance_to_yf(sym)
-    period = {"1d": "2y", "1wk": "5y", "1w": "5y", "1mo": "max", "1M": "max"}.get(interval, "2y")
-    df = fetch_yfinance_history(yf_sym, period=period, interval=interval)
-    return df, DataMeta(fonte="Yahoo Finance (crypto)", atualizado_em=_now_hms(), tipo_dado="delay", confiavel=False)
+    # 3. Yahoo Finance (fallback final)
+    if df is None:
+        yf_sym = _symbol_binance_to_yf(sym)
+        period = {"1d": "2y", "1wk": "5y", "1w": "5y", "1mo": "max", "1M": "max"}.get(interval, "2y")
+        df = fetch_yfinance_history(yf_sym, period=period, interval=interval)
+        meta = DataMeta(fonte="Yahoo Finance (crypto)", atualizado_em=_now_hms(), tipo_dado="delay", confiavel=False)
+
+    # Converte USD → BRL em todas as colunas de preço
+    usd_brl = get_usd_brl_rate()
+    for col in ("open", "high", "low", "close"):
+        df[col] = (df[col] * usd_brl).round(2)
+
+    meta = DataMeta(
+        fonte=meta.fonte,
+        atualizado_em=meta.atualizado_em,
+        tipo_dado=f"{meta.tipo_dado} · USD->BRL {usd_brl:.4f}",
+        confiavel=meta.confiavel,
+    )
+    return df, meta
 
 
 def fetch_yfinance_history(symbol: str = "PETR4.SA", period: str = "1y", interval: str = "1d") -> pd.DataFrame:
