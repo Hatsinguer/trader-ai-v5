@@ -1,0 +1,42 @@
+# Variáveis de ambiente — NUNCA commitar
+.env
+*.env
+.env.local
+.env.*.local
+
+# Chaves de API — NUNCA commitar
+cdp_api_key.json
+*.json.key
+secrets.json
+
+# Dados locais gerados em runtime
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit cache local
+.streamlit/secrets.toml

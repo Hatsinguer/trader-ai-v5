@@ -53,6 +53,10 @@ def classify_asset(ticker: str) -> str:
     if re.fullmatch(r"[A-Z]{4}3[0-9][A-Z]?", t):
         return "BDR"
 
+    # Fracionárias: 4 letras + dígito + F (ex.: PETR4F, BBSE3F, VALE3F).
+    if re.fullmatch(r"[A-Z]{4}\dF", t):
+        return "Ação Fracionária"
+
     # Ações: 4 letras + dígito final (3 = ON; 4/5/6 = PN).
     if re.fullmatch(r"[A-Z]{4}\d{1,2}", t):
         last = t[-1]

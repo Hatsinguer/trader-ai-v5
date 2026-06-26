@@ -37,7 +37,7 @@ from src.backtest import (
     rsi_reversal_backtest,
 )
 from src.report import generate_analysis_report
-from src.data import DataMeta, binance_meta, fetch_b3_history, fetch_binance_klines, fetch_yfinance_history
+from src.data import DataMeta, binance_meta, fetch_b3_history, fetch_binance_klines, fetch_crypto_history, fetch_yfinance_history
 from src.fundamentals import fetch_fundamentals, quick_reading
 from src.indicators import add_indicators
 from src.storage import (
@@ -62,6 +62,23 @@ from src.storage import (
 load_dotenv()
 
 st.set_page_config(page_title="Trader AI MVP", layout="wide")
+
+# --- Proteção por senha (opcional) ---
+# Configure APP_PASSWORD nos Secrets do Streamlit Cloud para ativar.
+# Deixe em branco (ou não defina) para desativar a proteção.
+_APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+if _APP_PASSWORD:
+    if not st.session_state.get("_authenticated"):
+        st.title("Trader AI v5")
+        pwd = st.text_input("Senha de acesso", type="password", key="_pwd_input")
+        if st.button("Entrar"):
+            if pwd == _APP_PASSWORD:
+                st.session_state["_authenticated"] = True
+                st.rerun()
+            else:
+                st.error("Senha incorreta.")
+        st.stop()
+
 st.title("Trader AI MVP — análise técnica com IA")
 st.caption("Ferramenta educacional para análise própria. Não envia ordens e não constitui recomendação de investimento.")
 
@@ -72,8 +89,7 @@ CALLS = ["COMPRA_TÉCNICA_AGRESSIVA", "COMPRA_TÉCNICA", "MONITORAR_COMPRA", "AG
 def load_data_with_meta(source: str, symbol: str, interval: str, limit: int | None, period: str | None) -> tuple[pd.DataFrame, DataMeta]:
     """Carrega dados com metadados de fonte. B3 usa fallback Brapi -> yfinance."""
     if source == "Binance Spot":
-        df = fetch_binance_klines(symbol=symbol, interval=interval, limit=limit or 500)
-        return df, binance_meta()
+        return fetch_crypto_history(symbol=symbol, interval=interval, limit=limit or 500)
     return fetch_b3_history(symbol, period=period or "1y", interval=interval)
 
 
@@ -422,11 +438,21 @@ if mode == "Análise Completa (v5)":
         symbol_v5 = st.text_input("Ativo", value="PETR4", help="Ex: PETR4, VALE3, BOVA11, BTCUSDT")
         interval_v5 = st.selectbox("Intervalo", ["1d", "1wk", "1mo"], index=0, key="v5_interval")
         period_v5 = st.selectbox("Período", ["6mo", "1y", "2y", "5y"], index=1, key="v5_period")
-        st.caption("Ações da B3: informe só o código (o .SA é adicionado automaticamente). Cripto: use sufixo USDT.")
+        st.caption("Ações da B3: informe só o código (ex: PETR4, BBSE3F). Fracionários são suportados. Cripto: use sufixo USDT.")
 
     sym = symbol_v5.strip().upper()
     is_crypto = sym.endswith("USDT")
     src = "Binance Spot" if is_crypto else "B3 (Brapi → Yahoo)"
+
+    if classify_asset(sym) == "Ação Fracionária":
+        lot_code = sym[:-1]
+        st.warning(
+            f"**Ativo fracionário detectado ({sym}).**  \n"
+            "Fracionários têm volume e liquidez muito menores que o lote-padrão, "
+            "o que torna indicadores de volume (OBV, vol financeiro) menos confiáveis. "
+            f"A análise de preço (RSI, MACD, médias) funciona normalmente.  \n"
+            f"Para análise com maior confiança, considere analisar o lote: **{lot_code}**."
+        )
 
     try:
         if is_crypto:
