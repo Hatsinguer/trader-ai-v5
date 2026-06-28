@@ -39,8 +39,11 @@ class DataMeta:
         return f"{self.fonte} ({self.tipo_dado})"
 
 
+_TZ_BRASILIA = timezone(timedelta(hours=-3))
+
+
 def _now_hms() -> str:
-    return datetime.now().strftime("%H:%M:%S")
+    return datetime.now(tz=_TZ_BRASILIA).strftime("%H:%M:%S")
 
 
 def _is_fracionario(symbol: str) -> bool:
