@@ -806,8 +806,8 @@ elif mode == "Análise individual":
         df, data_meta = load_data_with_meta(source, symbol, interval, limit, period)
         render_source_badge(data_meta)
         df_ind = add_indicators(df)
-        signal = build_signal(df_ind)
-        opportunity = build_opportunity_call(signal, profile=profile)
+        signal = build_signal_v5(df_ind)
+        opportunity = build_opportunity_call_v5(signal, profile=profile)
 
         last = df_ind.dropna().iloc[-1]
         c1, c2, c3, c4, c5 = st.columns(5)
@@ -843,11 +843,26 @@ elif mode == "Análise individual":
 
             st.subheader("Plano técnico do algoritmo")
             st.write(f"**Viés técnico:** {opportunity.technical_bias}")
-            st.write(f"**Preço de referência:** {opportunity.reference_price}")
-            st.write(f"**Invalidação técnica:** {opportunity.invalidation_price}")
-            st.write(f"**Alvo técnico 1 por ATR:** {opportunity.target_1_atr}")
-            st.write(f"**Alvo técnico 2 por ATR:** {opportunity.target_2_atr}")
+            st.write(f"**Tendência:** {opportunity.trend_strength}")
+            st.write(f"**Distância da SMA20:** {opportunity.distance_from_sma20_pct:+.2f}%")
+            st.write(f"**Preço de referência:** {opportunity.reference_price:,.2f}")
+            if opportunity.buy_zone_low and opportunity.buy_zone_high:
+                st.write(f"**Zona de compra (pullback):** {opportunity.buy_zone_low:,.2f} – {opportunity.buy_zone_high:,.2f}")
+            st.write(f"**Stop técnico:** {opportunity.invalidation_price:,.2f}" if opportunity.invalidation_price else "**Stop técnico:** —")
+            st.write(f"**Alvo 1 (base):** {opportunity.target_1_atr:,.2f}" if opportunity.target_1_atr else "**Alvo 1:** —")
+            st.write(f"**Alvo 2 (otimista):** {opportunity.target_2_atr:,.2f}" if opportunity.target_2_atr else "**Alvo 2:** —")
+            if opportunity.risk_reward_ratio:
+                st.write(f"**Risco:Retorno:** 1:{opportunity.risk_reward_ratio}")
             st.caption(opportunity.risk_reward_note)
+            if opportunity.justification_bullets:
+                st.markdown("**Justificativa:**")
+                for bullet in opportunity.justification_bullets:
+                    st.markdown(f"- {bullet}")
+            if opportunity.action_plan:
+                st.markdown("**Plano de ação:**")
+                for line in opportunity.action_plan.split("\n"):
+                    if line.strip():
+                        st.markdown(f"- {line.strip()}")
 
         with right:
             st.subheader("Snapshot")
