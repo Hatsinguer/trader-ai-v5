@@ -58,6 +58,7 @@ from src.storage import (
     upsert_position_v5,
     upsert_watchlist,
 )
+from src.day_trade import render_market_clocks, is_b3_open
 
 load_dotenv()
 
@@ -81,6 +82,7 @@ if _APP_PASSWORD:
 
 st.title("Trader AI MVP — análise técnica com IA")
 st.caption("Ferramenta educacional para análise própria. Não envia ordens e não constitui recomendação de investimento.")
+render_market_clocks()
 
 CALLS = ["COMPRA_TÉCNICA_AGRESSIVA", "COMPRA_TÉCNICA", "MONITORAR_COMPRA", "AGUARDAR", "EVITAR_COMPRA"]
 
