@@ -1264,8 +1264,6 @@ def render_mesa_day_trade_tab() -> None:
     config = load_mesa_config()
     mjolnir_cfg = config.get("mjolnir", {})
 
-    # ---------- Relógios e status de mercado ----------
-    render_market_clocks()
     b3_open, b3_status_label = is_b3_open()
     st.caption("⚠️ Dados com possível atraso (Brapi/Yahoo). Use o campo Preço manual para inserir cotação direta do Home Broker.")
 
