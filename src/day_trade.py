@@ -17,7 +17,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+    _TZ_BR = ZoneInfo("America/Sao_Paulo")
+    _TZ_NY = ZoneInfo("America/New_York")
+except ImportError:
+    from dateutil import tz as _dtz  # sempre disponível via pandas → python-dateutil
+    _TZ_BR = _dtz.gettz("America/Sao_Paulo")  # type: ignore[assignment]
+    _TZ_NY = _dtz.gettz("America/New_York")   # type: ignore[assignment]
 
 import numpy as np
 import pandas as pd
@@ -32,9 +39,6 @@ from src.indicators import add_indicators
 from src.costs import FeeParams, buy_total_cost, sell_simulation
 
 _MESA_CONFIG_PATH = Path(__file__).resolve().parents[1] / "data" / "mesa_config.json"
-
-_TZ_BR = ZoneInfo("America/Sao_Paulo")
-_TZ_NY = ZoneInfo("America/New_York")
 
 
 # ============================================================
