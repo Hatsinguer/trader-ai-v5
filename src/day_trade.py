@@ -23,7 +23,6 @@ _TZ_BR = timezone(timedelta(hours=-3))  # Brasília UTC-3 (Brasil não tem horá
 import numpy as np
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ------------------------------------------------------------------
 # Imports do ecossistema v5 (sem modificar nenhuma dessas funções)

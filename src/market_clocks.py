@@ -25,7 +25,7 @@ def is_b3_open() -> tuple[bool, str]:
 
 
 def render_market_clocks() -> None:
-    """Barra compacta com horário Brasília / Nova York e status da B3 (renderização server-side)."""
+    """Relógios compactos para sidebar: Brasília e Nova York em linhas separadas."""
     now_br = datetime.now(tz=_TZ_BR)
 
     # Nova York: EDT (UTC-4) de mar a nov, EST (UTC-5) restante
@@ -36,20 +36,15 @@ def render_market_clocks() -> None:
     wd = now_br.weekday()
     tm = now_br.hour * 60 + now_br.minute
     if wd >= 5:
-        b3_style = "background:#7f1d1d;color:#fca5a5"
-        b3_txt = "Fechado"
+        b3_bg, b3_color, b3_txt = "#7f1d1d", "#fca5a5", "Fechado"
     elif 570 <= tm < 600:
-        b3_style = "background:#78350f;color:#fde68a"
-        b3_txt = "Pré-abertura"
+        b3_bg, b3_color, b3_txt = "#78350f", "#fde68a", "Pré-abertura"
     elif 600 <= tm < 1015:
-        b3_style = "background:#14532d;color:#86efac"
-        b3_txt = "Aberto ✅"
+        b3_bg, b3_color, b3_txt = "#14532d", "#86efac", "Aberto ✅"
     elif 1050 <= tm < 1125:
-        b3_style = "background:#78350f;color:#fde68a"
-        b3_txt = "After-market"
+        b3_bg, b3_color, b3_txt = "#78350f", "#fde68a", "After-market"
     else:
-        b3_style = "background:#7f1d1d;color:#fca5a5"
-        b3_txt = "Fechado"
+        b3_bg, b3_color, b3_txt = "#7f1d1d", "#fca5a5", "Fechado"
 
     # Status NYSE
     tm_ny = now_ny.hour * 60 + now_ny.minute
@@ -67,21 +62,13 @@ def render_market_clocks() -> None:
     ny_time = now_ny.strftime("%H:%M:%S")
 
     st.markdown(
-        f"""<div style="display:flex;align-items:center;gap:16px;padding:5px 14px;
-        background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
-        border-radius:8px;font-family:Inter,sans-serif;font-size:13px;color:#ccc;
-        width:fit-content;margin:2px 0 10px 0;">
-            <span style="display:flex;align-items:center;gap:6px;">
-                <span style="opacity:.55;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">🇧🇷 Brasília</span>
-                <b style="font-size:14px;color:#fff;font-variant-numeric:tabular-nums;">{br_time}</b>
-                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;{b3_style};">B3 {b3_txt}</span>
-            </span>
-            <span style="opacity:.2;">|</span>
-            <span style="display:flex;align-items:center;gap:6px;">
-                <span style="opacity:.55;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">🇺🇸 Nova York</span>
-                <b style="font-size:14px;color:#fff;font-variant-numeric:tabular-nums;">{ny_time}</b>
-                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#1e3a5f;color:#93c5fd;">NYSE {ny_txt}</span>
-            </span>
+        f"""<div style="font-size:11px;color:#999;margin:2px 0 6px;line-height:2;">
+            <span>🇧🇷 <b style="color:#eee;font-size:13px;font-variant-numeric:tabular-nums;">{br_time}</b>
+            &nbsp;<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;
+            background:{b3_bg};color:{b3_color};">B3 {b3_txt}</span></span><br>
+            <span>🇺🇸 <b style="color:#eee;font-size:13px;font-variant-numeric:tabular-nums;">{ny_time}</b>
+            &nbsp;<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;
+            background:#1e3a5f;color:#93c5fd;">NYSE {ny_txt}</span></span>
         </div>""",
         unsafe_allow_html=True,
     )
