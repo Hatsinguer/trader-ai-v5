@@ -58,7 +58,7 @@ from src.storage import (
     upsert_position_v5,
     upsert_watchlist,
 )
-from src.day_trade import render_market_clocks, is_b3_open
+from src.market_clocks import render_market_clocks, is_b3_open
 
 load_dotenv()
 
