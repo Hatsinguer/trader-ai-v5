@@ -426,6 +426,7 @@ mode = st.sidebar.radio(
         "Radar de ações",
         "Gestão de posição / Venda",
         "Minhas listas e histórico",
+        "🎯 Mesa Day Trade",
     ],
     index=0,
 )
@@ -1213,3 +1214,7 @@ elif mode == "Minhas listas e histórico":
                 file_name="historico_analises.csv",
                 mime="text/csv",
             )
+
+elif mode == "🎯 Mesa Day Trade":
+    from src.day_trade import render_mesa_day_trade_tab
+    render_mesa_day_trade_tab()
