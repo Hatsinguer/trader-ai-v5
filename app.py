@@ -82,7 +82,6 @@ if _APP_PASSWORD:
 
 st.title("Trader AI MVP — análise técnica com IA")
 st.caption("Ferramenta educacional para análise própria. Não envia ordens e não constitui recomendação de investimento.")
-render_market_clocks()
 
 CALLS = ["COMPRA_TÉCNICA_AGRESSIVA", "COMPRA_TÉCNICA", "MONITORAR_COMPRA", "AGUARDAR", "EVITAR_COMPRA"]
 
@@ -434,6 +433,8 @@ mode = st.sidebar.radio(
 )
 profile = st.sidebar.selectbox("Perfil do algoritmo", ["Conservador", "Moderado", "Agressivo"], index=2)
 st.sidebar.caption("O perfil agressivo aceita sinais mais antecipados e stops mais largos por ATR, mas tende a gerar mais falsos positivos.")
+with st.sidebar:
+    render_market_clocks()
 
 if mode == "Análise Completa (v5)":
     with st.sidebar:
