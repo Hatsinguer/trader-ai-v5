@@ -31,7 +31,7 @@ import streamlit.components.v1 as components
 from src.data import fetch_history
 from src.indicators import add_indicators
 from src.costs import FeeParams, buy_total_cost, sell_simulation
-from src.market_clocks import render_market_clocks, is_b3_open
+from src.market_clocks import is_b3_open
 
 _MESA_CONFIG_PATH = Path(__file__).resolve().parents[1] / "data" / "mesa_config.json"
 
