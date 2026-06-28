@@ -14,15 +14,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
-try:
-    from zoneinfo import ZoneInfo
-    _TZ_BR = ZoneInfo("America/Sao_Paulo")
-except ImportError:
-    from dateutil import tz as _dtz
-    _TZ_BR = _dtz.gettz("America/Sao_Paulo")  # type: ignore[assignment]
+
+_TZ_BR = timezone(timedelta(hours=-3))  # Brasília UTC-3 (Brasil não tem horário de verão desde 2019)
 
 import numpy as np
 import pandas as pd

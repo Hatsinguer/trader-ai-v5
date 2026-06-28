@@ -1,17 +1,12 @@
 """Relógios de mercado B3 / Nova York e verificação de status do pregão."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-try:
-    from zoneinfo import ZoneInfo
-    _TZ_BR = ZoneInfo("America/Sao_Paulo")
-except ImportError:
-    from dateutil import tz as _dtz
-    _TZ_BR = _dtz.gettz("America/Sao_Paulo")  # type: ignore[assignment]
+_TZ_BR = timezone(timedelta(hours=-3))  # Brasília UTC-3 (Brasil não tem horário de verão desde 2019)
 
 
 def is_b3_open() -> tuple[bool, str]:
