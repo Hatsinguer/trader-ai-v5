@@ -25,50 +25,38 @@ def is_b3_open() -> tuple[bool, str]:
 
 
 def render_market_clocks() -> None:
-    """Relógios compactos para sidebar: Brasília e Nova York em linhas separadas."""
+    """Duas linhas de caption na sidebar: horário BR e NY com status de mercado."""
     now_br = datetime.now(tz=_TZ_BR)
 
-    # Nova York: EDT (UTC-4) de mar a nov, EST (UTC-5) restante
     ny_off = -4 if 3 <= now_br.month <= 11 else -5
     now_ny = datetime.now(tz=timezone(timedelta(hours=ny_off)))
 
-    # Status B3
     wd = now_br.weekday()
     tm = now_br.hour * 60 + now_br.minute
     if wd >= 5:
-        b3_bg, b3_color, b3_txt = "#7f1d1d", "#fca5a5", "Fechado"
+        b3_txt = "🔴 fechado"
     elif 570 <= tm < 600:
-        b3_bg, b3_color, b3_txt = "#78350f", "#fde68a", "Pré-abertura"
+        b3_txt = "🟡 pré-abertura"
     elif 600 <= tm < 1015:
-        b3_bg, b3_color, b3_txt = "#14532d", "#86efac", "Aberto ✅"
+        b3_txt = "🟢 aberto"
     elif 1050 <= tm < 1125:
-        b3_bg, b3_color, b3_txt = "#78350f", "#fde68a", "After-market"
+        b3_txt = "🟡 after-market"
     else:
-        b3_bg, b3_color, b3_txt = "#7f1d1d", "#fca5a5", "Fechado"
+        b3_txt = "🔴 fechado"
 
-    # Status NYSE
     tm_ny = now_ny.hour * 60 + now_ny.minute
     wd_ny = now_ny.weekday()
     if wd_ny >= 5:
-        ny_txt = "Fechado"
+        ny_txt = "🔴 fechado"
     elif 570 <= tm_ny < 960:
-        ny_txt = "Aberto"
+        ny_txt = "🟢 aberto"
     elif 960 <= tm_ny < 1200:
-        ny_txt = "After-hours"
+        ny_txt = "🟡 after-hours"
     else:
-        ny_txt = "Fechado"
+        ny_txt = "🔴 fechado"
 
-    br_time = now_br.strftime("%H:%M:%S")
-    ny_time = now_ny.strftime("%H:%M:%S")
+    br_time = now_br.strftime("%H:%M")
+    ny_time = now_ny.strftime("%H:%M")
 
-    st.markdown(
-        f"""<div style="font-size:11px;color:#999;margin:2px 0 6px;line-height:2;">
-            <span>🇧🇷 <b style="color:#eee;font-size:13px;font-variant-numeric:tabular-nums;">{br_time}</b>
-            &nbsp;<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;
-            background:{b3_bg};color:{b3_color};">B3 {b3_txt}</span></span><br>
-            <span>🇺🇸 <b style="color:#eee;font-size:13px;font-variant-numeric:tabular-nums;">{ny_time}</b>
-            &nbsp;<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;
-            background:#1e3a5f;color:#93c5fd;">NYSE {ny_txt}</span></span>
-        </div>""",
-        unsafe_allow_html=True,
-    )
+    st.caption(f"🇧🇷 Brasília {br_time} · B3 {b3_txt}")
+    st.caption(f"🇺🇸 Nova York {ny_time} · NYSE {ny_txt}")
