@@ -106,6 +106,7 @@ def extrair_precos(page) -> dict[str, dict]:
         var_txt    = _cell("netChange")
         minima_txt = _cell("low")
         maxima_txt = _cell("high")
+        hb_ts_txt  = _cell("openDateFormatted")  # ex: "26/06/2026 • 18:39:56"
 
         preco = _preco_float(preco_txt)
         if preco is None:
@@ -115,13 +116,21 @@ def extrair_precos(page) -> dict[str, dict]:
         var_limpo = re.sub(r"[^0-9,.\-]", "", var_txt)
         variacao  = _preco_float(var_limpo)
 
+        # Extrai só o horário do timestamp do broker ("26/06/2026 • 18:39:56" → "18:39:56")
+        horario_hb = None
+        if hb_ts_txt and "•" in hb_ts_txt:
+            horario_hb = hb_ts_txt.split("•")[-1].strip()
+        elif hb_ts_txt and ":" in hb_ts_txt:
+            horario_hb = hb_ts_txt.strip()
+
         resultado[ticker] = {
-            "preco":      preco,
-            "variacao":   variacao,
-            "minima":     _preco_float(minima_txt),
-            "maxima":     _preco_float(maxima_txt),
+            "preco":        preco,
+            "variacao":     variacao,
+            "minima":       _preco_float(minima_txt),
+            "maxima":       _preco_float(maxima_txt),
+            "horario_hb":   horario_hb,
             "capturado_em": datetime.now(tz=_TZ_BR).strftime("%H:%M:%S"),
-            "fonte":      "DOM (Home Broker)",
+            "fonte":        "DOM (Home Broker)",
         }
 
     return resultado
@@ -141,13 +150,14 @@ def _imprimir(precos: dict[str, dict]) -> None:
     if not precos:
         print("   (nenhum preço extraído)")
         return
-    print(f"   {'Ticker':<10} {'Preço':>9}  {'Var%':>7}  {'Mín':>9}  {'Máx':>9}")
-    print("   " + "-" * 52)
+    print(f"   {'Ticker':<10} {'Preço':>9}  {'Var%':>7}  {'Mín':>9}  {'Máx':>9}  {'HB':>8}")
+    print("   " + "-" * 62)
     for tk, d in sorted(precos.items()):
         var = f"{d['variacao']:+.2f}%" if d.get("variacao") is not None else "  —  "
         mn  = f"{d['minima']:.2f}"  if d.get("minima")   else "  —  "
         mx  = f"{d['maxima']:.2f}"  if d.get("maxima")   else "  —  "
-        print(f"   {tk:<10} {d['preco']:>9.2f}  {var:>7}  {mn:>9}  {mx:>9}")
+        hb  = d.get("horario_hb") or "  —  "
+        print(f"   {tk:<10} {d['preco']:>9.2f}  {var:>7}  {mn:>9}  {mx:>9}  {hb:>8}")
 
 
 # ════════════════════════════════════════════════════════════════════════════
