@@ -36,9 +36,11 @@ _MESA_CONFIG_PATH   = Path(__file__).resolve().parents[1] / "data" / "mesa_confi
 _PRECOS_CAPTURA_PATH = Path(__file__).resolve().parents[1] / "data" / "precos_capturados.json"
 
 
-def _ler_precos_capturados() -> dict[str, float]:
+def _ler_precos_capturados() -> dict[str, dict]:
     """Lê data/precos_capturados.json gerado pelo captura_precos.py.
-    Descarta entradas com mais de 5 minutos de idade."""
+    Descarta entradas com mais de 5 minutos de idade.
+    Retorna dict completo: { "VALE3": { preco, minima, maxima, variacao, horario_hb, ... } }
+    """
     if not _PRECOS_CAPTURA_PATH.exists():
         return {}
     try:
@@ -46,16 +48,61 @@ def _ler_precos_capturados() -> dict[str, float]:
     except Exception:
         return {}
     agora = datetime.now(tz=_TZ_BR)
-    precos: dict[str, float] = {}
+    resultado: dict[str, dict] = {}
     for ticker, info in dados.items():
         try:
             h, m, s = info["capturado_em"].split(":")
             capturado = agora.replace(hour=int(h), minute=int(m), second=int(s))
             if abs((agora - capturado).total_seconds()) <= 300:
-                precos[ticker.upper().replace(".SA", "")] = float(info["preco"])
+                resultado[ticker.upper().replace(".SA", "")] = info
         except Exception:
             pass
-    return precos
+    return resultado
+
+
+def _injetar_candle_hoje(df: "pd.DataFrame", info: dict) -> "pd.DataFrame":
+    """Constrói um candle parcial do dia atual com dados do Home Broker e
+    o anexa ao DataFrame histórico (se a data de hoje ainda não estiver lá).
+
+    Colunas esperadas no df: datetime, open, high, low, close, volume (lowercase, tz-naive).
+    """
+    hoje = datetime.now(tz=_TZ_BR).date()
+    ultimo = pd.Timestamp(df["datetime"].iloc[-1]).date()
+
+    # Se o último candle já é hoje, atualiza high/low/close in-place
+    close = float(info.get("preco", 0))
+    high  = float(info.get("maxima") or close)
+    low   = float(info.get("minima") or close)
+    if close <= 0:
+        return df
+
+    # Open: estima pelo preço anterior ajustado pela variação do dia
+    variacao = info.get("variacao")
+    if variacao is not None:
+        try:
+            open_ = round(close / (1 + float(variacao) / 100), 2)
+        except (ValueError, ZeroDivisionError):
+            open_ = float(df["close"].iloc[-1])
+    else:
+        open_ = float(df["close"].iloc[-1])
+
+    # Volume do dia: usa média dos últimos 20 dias como placeholder
+    vol_med = float(df["volume"].tail(20).mean()) if len(df) >= 5 else 0.0
+
+    novo = pd.DataFrame([{
+        "datetime": pd.Timestamp(hoje),
+        "open":     open_,
+        "high":     max(high, open_, close),
+        "low":      min(low,  open_, close),
+        "close":    close,
+        "volume":   vol_med,
+    }])
+
+    if ultimo == hoje:
+        # Substitui o candle de hoje pelos dados capturados
+        df = df.iloc[:-1].copy()
+
+    return pd.concat([df, novo], ignore_index=True)
 
 
 # ============================================================
@@ -102,6 +149,7 @@ class MesaAtivo:
     status: str = "AGUARDAR"
     fonte_preco: str = ""
     atualizado_em: str = ""
+    candle_injetado: bool = False
     mjolnir_score: Optional[int] = None
     mjolnir_classificacao: Optional[str] = None
     mjolnir_status: Optional[str] = None
@@ -1129,27 +1177,39 @@ def load_mesa_data(ticker: str, robo: str, capital: float, fees_params: tuple) -
             sym = f"{sym}.SA"
 
         df, meta = fetch_history(sym, period="3mo", interval="1d", limit=300)
+
+        # Injeta candle do dia atual com dados do Home Broker (captura_precos.py)
+        tk_norm = ticker.strip().upper().replace(".SA", "")
+        captura = _ler_precos_capturados()
+        info_captura = captura.get(tk_norm)
+
+        candle_injetado = False
+        if info_captura:
+            df = _injetar_candle_hoje(df, info_captura)
+            candle_injetado = True
+
+        # Recalcula todos os indicadores sobre o df (agora com candle de hoje se disponível)
         df_ind = add_indicators(df, interval="1d")
 
         preco_api = round(float(df_ind["close"].iloc[-1]), 2)
 
-        # Sobrepõe com preço capturado em tempo real (captura_precos.py), se disponível
-        tk_norm = ticker.strip().upper().replace(".SA", "")
-        precos_captura = _ler_precos_capturados()
-        if tk_norm in precos_captura:
-            result["preco"] = precos_captura[tk_norm]
+        if candle_injetado:
+            result["preco"] = preco_api  # já é o preço capturado (close do candle injetado)
             result["fonte"] = "Captura local ⚡"
-            result["atualizado_em"] = datetime.now(tz=_TZ_BR).strftime("%H:%M:%S")
+            result["atualizado_em"] = info_captura.get("horario_hb") or datetime.now(tz=_TZ_BR).strftime("%H:%M:%S")
+            result["candle_injetado"] = True
         else:
             result["preco"] = preco_api
             result["fonte"] = meta.fonte
             result["atualizado_em"] = meta.atualizado_em
+            result["candle_injetado"] = False
 
         ativo = _rodar_robo(robo, df_ind, None, capital, fees, slippage_pct=0.1)
         ativo.ticker = ticker
         ativo.preco_atual = result["preco"]
         ativo.fonte_preco = result["fonte"]
         ativo.atualizado_em = result["atualizado_em"]
+        ativo.candle_injetado = result.get("candle_injetado", False)
 
         if _eh_futuro(ticker):
             ativo.status = "SOMENTE PLANEJAMENTO"
@@ -1468,7 +1528,8 @@ def render_mesa_day_trade_tab() -> None:
                 preco_ref = ativo.preco_manual if ativo.preco_manual else ativo.preco_atual
                 if preco_ref:
                     label_pm = " ✏️" if ativo.preco_manual else ""
-                    cols[1].markdown(f"R$ {preco_ref:,.2f}{label_pm}")
+                    indicadores_badge = " 📊" if ativo.candle_injetado else ""
+                    cols[1].markdown(f"R$ {preco_ref:,.2f}{label_pm}{indicadores_badge}")
                     cols[1].caption(f"{ativo.fonte_preco} · {ativo.atualizado_em}")
                 else:
                     cols[1].markdown("—")
