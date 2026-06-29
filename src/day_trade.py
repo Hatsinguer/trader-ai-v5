@@ -32,7 +32,30 @@ from src.indicators import add_indicators
 from src.costs import FeeParams, buy_total_cost, sell_simulation
 from src.market_clocks import is_b3_open
 
-_MESA_CONFIG_PATH = Path(__file__).resolve().parents[1] / "data" / "mesa_config.json"
+_MESA_CONFIG_PATH   = Path(__file__).resolve().parents[1] / "data" / "mesa_config.json"
+_PRECOS_CAPTURA_PATH = Path(__file__).resolve().parents[1] / "data" / "precos_capturados.json"
+
+
+def _ler_precos_capturados() -> dict[str, float]:
+    """Lê data/precos_capturados.json gerado pelo captura_precos.py.
+    Descarta entradas com mais de 5 minutos de idade."""
+    if not _PRECOS_CAPTURA_PATH.exists():
+        return {}
+    try:
+        dados = json.loads(_PRECOS_CAPTURA_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    agora = datetime.now(tz=_TZ_BR)
+    precos: dict[str, float] = {}
+    for ticker, info in dados.items():
+        try:
+            h, m, s = info["capturado_em"].split(":")
+            capturado = agora.replace(hour=int(h), minute=int(m), second=int(s))
+            if abs((agora - capturado).total_seconds()) <= 300:
+                precos[ticker.upper().replace(".SA", "")] = float(info["preco"])
+        except Exception:
+            pass
+    return precos
 
 
 # ============================================================
@@ -1108,15 +1131,25 @@ def load_mesa_data(ticker: str, robo: str, capital: float, fees_params: tuple) -
         df, meta = fetch_history(sym, period="3mo", interval="1d", limit=300)
         df_ind = add_indicators(df, interval="1d")
 
-        result["preco"] = round(float(df_ind["close"].iloc[-1]), 2)
-        result["fonte"] = meta.fonte
-        result["atualizado_em"] = meta.atualizado_em
+        preco_api = round(float(df_ind["close"].iloc[-1]), 2)
+
+        # Sobrepõe com preço capturado em tempo real (captura_precos.py), se disponível
+        tk_norm = ticker.strip().upper().replace(".SA", "")
+        precos_captura = _ler_precos_capturados()
+        if tk_norm in precos_captura:
+            result["preco"] = precos_captura[tk_norm]
+            result["fonte"] = "Captura local ⚡"
+            result["atualizado_em"] = datetime.now(tz=_TZ_BR).strftime("%H:%M:%S")
+        else:
+            result["preco"] = preco_api
+            result["fonte"] = meta.fonte
+            result["atualizado_em"] = meta.atualizado_em
 
         ativo = _rodar_robo(robo, df_ind, None, capital, fees, slippage_pct=0.1)
         ativo.ticker = ticker
         ativo.preco_atual = result["preco"]
-        ativo.fonte_preco = meta.fonte
-        ativo.atualizado_em = meta.atualizado_em
+        ativo.fonte_preco = result["fonte"]
+        ativo.atualizado_em = result["atualizado_em"]
 
         if _eh_futuro(ticker):
             ativo.status = "SOMENTE PLANEJAMENTO"
