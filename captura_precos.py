@@ -71,63 +71,65 @@ def _preco_float(texto: str) -> float | None:
 
 def extrair_precos(page) -> dict[str, dict]:
     """
-    Lê todas as linhas do AG Grid e retorna:
-      { "PETR4": { "preco": 38.45, "variacao": 1.23, "minima": 37.8, "maxima": 39.1 } }
-
-    Estrutura DOM esperada (XP Invest Home Broker):
-      div[role="row"][row-id="PETR4"]
-        div[col-id="lastPrice"]  → preço atual
-        div[col-id="netChange"]  → variação %
-        div[col-id="low"]        → mínima
-        div[col-id="high"]       → máxima
+    Lê todas as linhas do AG Grid via JavaScript — pega todas as colunas
+    independente do scroll horizontal ou tamanho da janela.
     """
     resultado: dict[str, dict] = {}
 
     try:
-        # Aguarda o grid estar presente
         page.wait_for_selector('div[role="row"][row-id]', timeout=8_000)
     except Exception:
         print("⚠  Grid de preços não encontrado na página. Verifique se a aba está aberta.")
         return resultado
 
-    rows = page.query_selector_all('div[role="row"][row-id]')
+    # JavaScript lê diretamente do DOM — cada row pode estar em qualquer
+    # container (left-pinned, center, right-pinned); usamos um Map para
+    # acumular todas as colunas de um mesmo row-id numa única entrada.
+    js_data: list[dict] = page.evaluate("""() => {
+        const seen = {};
+        const TICKER_RE = /^[A-Z]{3,6}\\d{1,2}F?$/;
 
-    for row in rows:
-        ticker = row.get_attribute("row-id")
-        if not ticker or not re.match(r"^[A-Z]{3,6}\d{1,2}[F]?$", ticker.upper()):
-            continue
-        ticker = ticker.upper()
+        document.querySelectorAll('div[role="row"][row-id]').forEach(row => {
+            const tid = (row.getAttribute('row-id') || '').toUpperCase();
+            if (!TICKER_RE.test(tid)) return;
 
-        def _cell(col_id: str) -> str:
-            el = row.query_selector(f'div[col-id="{col_id}"]')
-            return el.inner_text().strip() if el else ""
+            if (!seen[tid]) seen[tid] = {};
+            const entry = seen[tid];
 
-        preco_txt  = _cell("lastPrice")
-        var_txt    = _cell("netChange")
-        minima_txt = _cell("low")
-        maxima_txt = _cell("high")
-        hb_ts_txt  = _cell("openDateFormatted")  # ex: "26/06/2026 • 18:39:56"
+            row.querySelectorAll('div[col-id]').forEach(cell => {
+                const col = cell.getAttribute('col-id');
+                const txt = cell.innerText.trim();
+                if (txt) entry[col] = txt;
+            });
+        });
 
-        preco = _preco_float(preco_txt)
+        return Object.entries(seen).map(([ticker, cols]) => ({ticker, cols}));
+    }""")
+
+    for item in (js_data or []):
+        ticker = item["ticker"]
+        cols   = item.get("cols", {})
+
+        preco = _preco_float(cols.get("lastPrice", ""))
         if preco is None:
             continue
 
-        # Remove símbolos de variação (ex: "▲ 0.16%" → "0.16")
-        var_limpo = re.sub(r"[^0-9,.\-]", "", var_txt)
+        var_limpo = re.sub(r"[^0-9,.\-]", "", cols.get("netChange", ""))
         variacao  = _preco_float(var_limpo)
 
-        # Extrai só o horário do timestamp do broker ("26/06/2026 • 18:39:56" → "18:39:56")
-        horario_hb = None
-        if hb_ts_txt and "•" in hb_ts_txt:
-            horario_hb = hb_ts_txt.split("•")[-1].strip()
-        elif hb_ts_txt and ":" in hb_ts_txt:
-            horario_hb = hb_ts_txt.strip()
+        hb_ts = cols.get("openDateFormatted", "")
+        if "•" in hb_ts:
+            horario_hb = hb_ts.split("•")[-1].strip()
+        elif ":" in hb_ts:
+            horario_hb = hb_ts.strip()
+        else:
+            horario_hb = None
 
         resultado[ticker] = {
             "preco":        preco,
             "variacao":     variacao,
-            "minima":       _preco_float(minima_txt),
-            "maxima":       _preco_float(maxima_txt),
+            "minima":       _preco_float(cols.get("low", "")),
+            "maxima":       _preco_float(cols.get("high", "")),
             "horario_hb":   horario_hb,
             "capturado_em": datetime.now(tz=_TZ_BR).strftime("%H:%M:%S"),
             "fonte":        "DOM (Home Broker)",
